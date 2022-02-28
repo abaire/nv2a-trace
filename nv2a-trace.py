@@ -26,92 +26,6 @@ _enable_experimental_disable_z_compression_and_tiling = False
 # pylint: enable=invalid-name
 
 
-def _wait_for_stable_push_buffer_state(
-    xbox_helper: XboxHelper.XboxHelper, abort_flag: AbortFlag, verbose: bool = False
-):
-    """Blocks until the push buffer reaches a stable state."""
-
-    dma_pull_addr = 0
-    dma_push_addr_real = 0
-
-    while not abort_flag.should_abort:
-
-        # Stop consuming CACHE entries.
-        xbox_helper.disable_pgraph_fifo()
-        xbox_helper.wait_until_pgraph_idle()
-
-        # Kick the pusher so that it fills the CACHE.
-        xbox_helper.allow_populate_fifo_cache()
-
-        # Now drain the CACHE.
-        xbox_helper.enable_pgraph_fifo()
-
-        # Check out where the PB currently is and where it was supposed to go.
-        dma_push_addr_real = xbox_helper.get_dma_push_address()
-        dma_pull_addr = xbox_helper.get_dma_pull_address()
-
-        # Check if we have any methods left to run and skip those.
-        state = xbox_helper.parse_dma_state()
-        dma_method_count = state.method_count
-        dma_pull_addr += dma_method_count * 4
-
-        # Hide all commands from the PB by setting PUT = GET.
-        dma_push_addr_target = dma_pull_addr
-        xbox_helper.set_dma_push_address(dma_push_addr_target)
-
-        if verbose:
-            print("=== PRE RESUME ======")
-            print("Real push addr: 0x%X" % dma_push_addr_real)
-            xbox_helper.print_dma_addresses()
-            xbox_helper.print_cache_state()
-
-        # Resume pusher - The PB can't run yet, as it has no commands to process.
-        xbox_helper.resume_fifo_pusher()
-
-        # We might get issues where the pusher missed our PUT (miscalculated).
-        # This can happen as `dma_method_count` is not the most accurate.
-        # Probably because the DMA is halfway through a transfer.
-        # So we pause the pusher again to validate our state
-        xbox_helper.pause_fifo_pusher()
-
-        time.sleep(1.0)
-
-        if verbose:
-            print("   POST RESUME")
-            xbox_helper.print_dma_addresses()
-            xbox_helper.print_cache_state()
-
-        dma_push_addr_check = xbox_helper.get_dma_push_address()
-        dma_pull_addr_check = xbox_helper.get_dma_pull_address()
-
-        # We want the PB to be empty
-        if dma_pull_addr_check != dma_push_addr_check:
-            print(
-                "  Pushbuffer not empty - PULL (0x%08X) != PUSH (0x%08X)"
-                % (dma_pull_addr_check, dma_push_addr_check)
-            )
-            continue
-
-        # Ensure that we are at the correct offset
-        if dma_push_addr_check != dma_push_addr_target:
-            print(
-                "Oops PUT was modified; got 0x%08X but expected 0x%08X!"
-                % (dma_push_addr_check, dma_push_addr_target)
-            )
-            continue
-
-        break
-
-    if abort_flag.should_abort:
-        print("Restoring pfifo state...")
-        xbox_helper.set_dma_push_address(dma_push_addr_real)
-        xbox_helper.enable_pgraph_fifo()
-        xbox_helper.resume_fifo_pusher()
-        xbox_helper.print_enable_states()
-
-    return dma_pull_addr, dma_push_addr_real
-
-
 def experimental_disable_z_compression_and_tiling(xbox):
     # Disable Z-buffer compression and Tiling
     # FIXME: This is a dirty dirty hack which breaks PFB and PGRAPH state!
@@ -162,9 +76,17 @@ def _load_ntrc():
     )
     if not py_dyndxt_bootstrap.load(os.path.join(build_path, "libntrc_ddxt.dll")):
         raise Exception("Failed to inject ntrc tracer")
-    if not ntrc_ddxt.NTRC().connect():
+    tracer = ntrc_ddxt.NTRC()
+    if not tracer.connect():
         raise Exception("ntrc tracer installed but not responsive")
     print("NTRC module installed successfully")
+
+    tracer.startup()
+    print("NTRC tracer started, waiting for idle state")
+
+    tracer.wait_for_idle_state(5)
+
+    return tracer
 
 
 def main(args):
@@ -186,12 +108,10 @@ def main(args):
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    _load_ntrc()
+    ntrc_tracer = _load_ntrc()
 
     print("\n\nAwaiting stable PB state\n\n")
-    dma_pull_addr, dma_push_addr = _wait_for_stable_push_buffer_state(
-        xbox_helper, abort_flag, args.verbose
-    )
+    dma_push_addr, dma_pull_addr = ntrc_tracer.wait_for_stable_push_buffer_state()
 
     if not dma_pull_addr or not dma_push_addr or abort_flag.should_abort:
         if not abort_flag.should_abort:

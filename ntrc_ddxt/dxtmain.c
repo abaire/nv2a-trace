@@ -5,9 +5,11 @@
 
 #include "cmd_attach.h"
 #include "cmd_detach.h"
+#include "cmd_get_dma_addrs.h"
 #include "cmd_get_state.h"
 #include "cmd_hello.h"
 #include "cmd_wait_for_stable_push_buffer_state.h"
+#include "nxdk_dxt_dll_main.h"
 #include "tracer_state_machine.h"
 
 // Command prefix that will be handled by this processor.
@@ -18,6 +20,7 @@ static const uint32_t kTag = 0x6E747263;  // 'ntrc'
 static const CommandTableEntry kCommandTableDef[] = {
     {CMD_ATTACH, HandleAttach},
     {CMD_DETACH, HandleDetach},
+    {CMD_GET_DMA_ADDRS, HandleGetDMAAddrs},
     {CMD_GET_STATE, HandleGetState},
     {CMD_HELLO, HandleHello},
     {CMD_WAIT_FOR_STABLE_PUSH_BUFFER, HandleWaitForStablePushBufferState},
@@ -31,7 +34,7 @@ static HRESULT_API ProcessCommand(const char *command, char *response,
                                   struct CommandContext *ctx);
 static void OnTracerStateChanged(TracerState new_state);
 
-HRESULT __declspec(dllexport) DxtMain(void) {
+HRESULT DXTMain(void) {
   TracerInitialize(OnTracerStateChanged);
   return DmRegisterCommandProcessor(kHandlerName, ProcessCommand);
 }

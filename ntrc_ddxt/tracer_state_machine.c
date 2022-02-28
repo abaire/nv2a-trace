@@ -19,7 +19,9 @@ typedef struct TracerStateMachine {
 
 static TracerStateMachine state_machine = {0};
 
-static __stdcall DWORD TracerThreadMain(LPVOID lpThreadParameter);
+static DWORD __attribute__((stdcall))
+TracerThreadMain(LPVOID lpThreadParameter);
+
 static void SetState(TracerState new_state);
 static BOOL SetStateIfIdle(TracerState new_state);
 static void Shutdown(void);
@@ -41,6 +43,7 @@ HRESULT TracerCreate(void) {
   state_machine.processor_thread = CreateThread(
       NULL, 0, TracerThreadMain, NULL, 0, &state_machine.processor_thread_id);
   if (!state_machine.processor_thread) {
+    SetState(STATE_UNINITIALIZED);
     return XBOX_E_FAIL;
   }
 
@@ -69,6 +72,16 @@ TracerState TracerGetState(void) {
   return ret;
 }
 
+BOOL TracerGetDMAAddresses(DWORD *push_addr, DWORD *pull_addr) {
+  EnterCriticalSection(&state_machine.state_critical_section);
+  *push_addr = state_machine.dma_push_addr;
+  *pull_addr = state_machine.dma_pull_addr;
+  BOOL valid = TRUE;
+  LeaveCriticalSection(&state_machine.state_critical_section);
+
+  return valid;
+}
+
 static void SetState(TracerState new_state) {
   EnterCriticalSection(&state_machine.state_critical_section);
   BOOL changed = state_machine.state != new_state;
@@ -78,6 +91,14 @@ static void SetState(TracerState new_state) {
   if (changed && state_machine.on_notify_state_changed) {
     state_machine.on_notify_state_changed(new_state);
   }
+}
+
+static void SaveDMAAddresses(DWORD push_addr, DWORD pull_addr) {
+  EnterCriticalSection(&state_machine.state_critical_section);
+  state_machine.dma_pull_addr = pull_addr;
+  state_machine.dma_push_addr = push_addr;
+  state_machine.dma_addresses_valid = TRUE;
+  LeaveCriticalSection(&state_machine.state_critical_section);
 }
 
 static BOOL SetStateIfIdle(TracerState new_state) {
@@ -107,14 +128,27 @@ HRESULT TracerBeginWaitForStablePushBufferState(void) {
   return XBOX_E_ACCESS_DENIED;
 }
 
-static __stdcall DWORD TracerThreadMain(LPVOID lpThreadParameter) {
+static DWORD __attribute__((stdcall))
+TracerThreadMain(LPVOID lpThreadParameter) {
+  while (TracerGetState() == STATE_INIITIALIZING) {
+    Sleep(1);
+  }
+
+  // Check for any failures between the time the thread was created and the time
+  // it started running.
+  if (TracerGetState() != STATE_INITIALIZED) {
+    Shutdown();
+    return 0;
+  }
+
+  SetState(STATE_IDLE);
+
   while (1) {
     TracerState state = TracerGetState();
     if (state < STATE_INIITIALIZING) {
       break;
     }
 
-    // TODO: IMPLEMENT ME.
     switch (state) {
       case STATE_BEGIN_WAITING_FOR_STABLE_PUSH_BUFFER:
         WaitForStablePushBufferState();
@@ -207,10 +241,8 @@ static void WaitForStablePushBufferState(void) {
       continue;
     }
 
+    SaveDMAAddresses(dma_push_addr_real, dma_pull_addr);
     SetState(STATE_IDLE_STABLE_PUSH_BUFFER);
-    state_machine.dma_pull_addr = dma_pull_addr;
-    state_machine.dma_push_addr = dma_push_addr_real;
-    state_machine.dma_addresses_valid = TRUE;
     return;
   }
 
@@ -219,7 +251,5 @@ static void WaitForStablePushBufferState(void) {
   EnablePGRAPHFIFO();
   ResumeFIFOPusher();
 
-  state_machine.dma_pull_addr = dma_pull_addr;
-  state_machine.dma_push_addr = dma_push_addr_real;
-  state_machine.dma_addresses_valid = TRUE;
+  SaveDMAAddresses(dma_push_addr_real, dma_pull_addr);
 }

@@ -49,7 +49,7 @@ void BusyWaitUntilPusherIDLE(void) {
 
 void MaybePopulateFIFOCache(void) {
   ResumeFIFOPusher();
-  PauseFIFOPuller();
+  PauseFIFOPusher();
 }
 
 DWORD GetDMAPushAddress(void) { return ReadDWORD(DMA_PUSH_ADDR); }

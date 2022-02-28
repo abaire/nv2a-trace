@@ -29,6 +29,11 @@ ExternalProject_Add(
         ddxt/lib/xbdm.lib
         ddxt/lib/libdynamic_dxt_loader.lib
         ddxt/lib/libdynamic_dxt_loader.dll
+        ddxt/include/command_processor_util.h
+        ddxt/include/module_registry.h
+        ddxt/include/nxdk_dxt_dll_main.h
+        ddxt/include/xbdm.h
+        ddxt/include/xbdm_err.h
 )
 # The directory of header files for methods exported by the dynamic DXT loader.
 ExternalProject_Get_Property(dyndxt_loader INSTALL_DIR)
@@ -77,6 +82,8 @@ add_library(
         ntrc_ddxt/cmd_attach.h
         ntrc_ddxt/cmd_detach.c
         ntrc_ddxt/cmd_detach.h
+        ntrc_ddxt/cmd_get_dma_addrs.c
+        ntrc_ddxt/cmd_get_dma_addrs.h
         ntrc_ddxt/cmd_get_state.c
         ntrc_ddxt/cmd_get_state.h
         ntrc_ddxt/cmd_hello.c
@@ -91,6 +98,10 @@ add_library(
         ntrc_ddxt/tracer_state_machine.h
         ntrc_ddxt/xbox_helper.c
         ntrc_ddxt/xbox_helper.h
+        ${dyndxt_include_dir}/command_processor_util.h
+        ${dyndxt_include_dir}/nxdk_dxt_dll_main.h
+        ${dyndxt_include_dir}/xbdm.h
+        ${dyndxt_include_dir}/xbdm_err.h
         third_party/xqemu/hw/xbox/nv2a/nv2a_regs.h
 )
 target_include_directories(
@@ -106,7 +117,7 @@ target_link_options(
         PUBLIC
         -Wl,-machine:i386
         -B ${NXDK_DIR}/bin
-        -Wl,-entry:DxtMain
+        -Wl,-entry:DXTMainCRTStartup@0
         -Wl,-dynamicbase
         -Wl,-fixed:no
         -v

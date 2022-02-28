@@ -54,10 +54,21 @@ class _DynamicDXTLoader:
             raw_image = dll_file.read()
 
         cmd = f"ddxt!load size=0x{len(raw_image):x}"
-        status, message = if_xbdm.xbdm_command(cmd, raw_image, len(raw_image))
+
+        # Relocating the DLL can take some time and if_xbdm's timeout may be
+        # too short.
+        old_timeout = if_xbdm.xbdm.gettimeout()
+        if_xbdm.xbdm.settimeout(10)
+        try:
+            status, message = if_xbdm.xbdm_command(cmd, raw_image, len(raw_image))
+        finally:
+            if_xbdm.xbdm.settimeout(old_timeout)
+
         if status != 200:
             print(f"Load failed: {status} {message}")
             return False
+        else:
+            print(f"Loaded {dll_path}: {message}")
         return True
 
     def _bootstrap(self):
@@ -81,12 +92,13 @@ class _DynamicDXTLoader:
 
         self._fill_loader_export_registry()
 
-        return True
+        return self._check_loader_installed()
 
     def _check_loader_installed(self):
-        response = if_xbdm.xbdm_command("ddxt!hello")
-        if response[0] != 202:
+        status, message = if_xbdm.xbdm_command("ddxt!hello")
+        if status != 202:
             return False
+        print(f"Loader installed: {message}")
         self._bootstrapped = True
         return True
 
