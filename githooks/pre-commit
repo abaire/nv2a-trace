@@ -60,6 +60,37 @@ function check_no_donotsubmit {
   fi
 }
 
+function run_clang_format {
+  echo "${changed_c_filenames}" | grep -v '3rdparty'
+  if [[ "${changed_c_filenames}" == "" ]]; then
+    return
+  fi
+  # Run clang-format against any changed C++ files.
+  if ! which clang-format > /dev/null; then
+    cat <<\EOF
+Warning: clang-format is not installed or is not in the PATH.
+
+Please install and amend this commit.
+
+Debian:
+        sudo apt install clang-format
+EOF
+    return
+  fi
+
+  # Reformat the files in-place and re-add any that were changed.
+  #
+  # Note that this has the side effect of incorporating changes to staged files
+  # that were not themselves staged. E.g., if you edit a file, `git add`, then
+  # edit some more, then commit, all of the changes will be committed, not just
+  # the staged ones. Depending on typical workflows it might be better to do
+  # something more complicated here, or to just have the hook fail instead of
+  # perform an in-place fix.
+  files_to_format="$(echo "${changed_c_filenames}" | grep -v '3rdparty')"
+  echo "${files_to_format}" | xargs clang-format -i
+  echo "${files_to_format}" | xargs git add
+}
+
 
 if git rev-parse --verify HEAD >/dev/null 2>&1; then
   against=HEAD
@@ -75,6 +106,8 @@ exec 1>&2
 added_and_modified_filenames="$(git diff --cached --name-only --diff-filter=d)"
 changed_python_filenames="$(echo "${added_and_modified_filenames}" | \
                             grep -E '.*\.py$')"
+changed_c_filenames="$(echo "${added_and_modified_filenames}" | \
+                            grep -E '.*\.(c|cpp|h|hpp)$')"
 
 
 # Allow blank line at EOF.
@@ -82,5 +115,7 @@ git config --local core.whitespace -blank-at-eof
 
 run_black
 check_no_donotsubmit "${changed_python_filenames}"
+run_clang_format
+check_no_donotsubmit "${changed_c_filenames}"
 check_no_diffmarkers_or_whitespace_errors "${against}"
 
