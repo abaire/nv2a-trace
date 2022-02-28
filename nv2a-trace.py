@@ -16,9 +16,9 @@ import time
 from AbortFlag import AbortFlag
 import py_dyndxt_bootstrap
 import ntrc_ddxt
+import Trace
 from Xbox import Xbox
 import XboxHelper
-import Trace
 
 # pylint: disable=invalid-name
 # TODO: Remove tiling suppression once AGP read in Texture.py is fully proven.

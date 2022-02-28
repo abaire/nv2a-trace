@@ -2,9 +2,9 @@
 
 #include "register_defs.h"
 
-DWORD ReadDWORD(intptr_t address) { return *(DWORD*)(address); }
+DWORD ReadDWORD(intptr_t address) { return *(DWORD *)(address); }
 
-void WriteDWORD(intptr_t address, DWORD value) { *(DWORD*)(address) = value; }
+void WriteDWORD(intptr_t address, DWORD value) { *(DWORD *)(address) = value; }
 
 void DisablePGRAPHFIFO(void) {
   DWORD state = ReadDWORD(PGRAPH_STATE);
@@ -50,4 +50,20 @@ void BusyWaitUntilPusherIDLE(void) {
 void MaybePopulateFIFOCache(void) {
   ResumeFIFOPusher();
   PauseFIFOPuller();
+}
+
+DWORD GetDMAPushAddress(void) { return ReadDWORD(DMA_PUSH_ADDR); }
+
+DWORD GetDMAPullAddress(void) { return ReadDWORD(DMA_PULL_ADDR); }
+
+void SetDMAPushAddress(DWORD target) { WriteDWORD(DMA_PUSH_ADDR, target); }
+
+void GetDMAState(DMAState *state) {
+  DWORD dma_state = ReadDWORD(DMA_STATE);
+
+  state->non_increasing = (dma_state & 0x01) != 0;
+  state->method = (dma_state >> 2) & 0x1FFF;
+  state->subchannel = (dma_state >> 13) & 0x07;
+  state->method_count = (dma_state >> 18) & 0x7FF;
+  state->error = (dma_state >> 29) & 0x07;
 }

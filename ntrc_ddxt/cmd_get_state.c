@@ -6,6 +6,6 @@
 
 HRESULT HandleGetState(const char *command, char *response, DWORD response_len,
                        CommandContext *ctx) {
-  sprintf(response, "state=%d", GetTracerState());
+  sprintf(response, "state=%d", TracerGetState());
   return XBOX_S_OK;
 }

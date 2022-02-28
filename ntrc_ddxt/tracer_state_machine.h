@@ -10,22 +10,27 @@ typedef enum TracerState {
   STATE_UNINITIALIZED = 0,
 
   STATE_INIITIALIZING = 1,
-  STATE_INIITALIZED,
+  STATE_INITIALIZED,
 
-  STATE_IDLE,
+  STATE_IDLE = 100,
+  STATE_IDLE_STABLE_PUSH_BUFFER,
+  STATE_IDLE_LAST,  // Last entry in the block of "idle" states.
 
-  STATE_BEGIN_WAITING_FOR_STABLE_PUSH_BUFFER = 100,
+  STATE_BEGIN_WAITING_FOR_STABLE_PUSH_BUFFER = 1000,
   STATE_WAITING_FOR_STABLE_PUSH_BUFFER,
-  STATE_STABLE_PUSH_BUFFER,
 
 } TracerState;
 
-HRESULT Initialize(void);
+// Callback to be invoked when the tracer state changes.
+typedef void (*NotifyStateChangedHandler)(TracerState);
 
-void Destroy(void);
+HRESULT TracerInitialize(NotifyStateChangedHandler on_notify_state_changed);
 
-TracerState GetTracerState(void);
+HRESULT TracerCreate(void);
+void TracerDestroy(void);
 
-HRESULT BeginWaitForStablePushBufferState(void);
+TracerState TracerGetState(void);
+
+HRESULT TracerBeginWaitForStablePushBufferState(void);
 
 #endif  // NV2A_TRACE_TRACER_STATE_MACHINE_H

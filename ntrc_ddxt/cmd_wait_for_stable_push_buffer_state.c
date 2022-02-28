@@ -9,7 +9,7 @@
 HRESULT HandleWaitForStablePushBufferState(const char *command, char *response,
                                            DWORD response_len,
                                            CommandContext *ctx) {
-  HRESULT ret = BeginWaitForStablePushBufferState();
+  HRESULT ret = TracerBeginWaitForStablePushBufferState();
 
   *response = 0;
   if (XBOX_SUCCESS(ret)) {

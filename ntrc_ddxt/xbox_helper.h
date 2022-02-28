@@ -5,6 +5,14 @@
 
 #include "exchange_dword.h"
 
+typedef struct DMAState {
+  BOOL non_increasing;
+  DWORD method;
+  DWORD subchannel;
+  DWORD method_count;
+  DWORD error;
+} DMAState;
+
 // Returns a DWORD value from the given address.
 DWORD ReadDWORD(intptr_t address);
 
@@ -25,5 +33,11 @@ void BusyWaitUntilPusherIDLE(void);
 // Attempt to populate the FIFO cache by briefly unpausing the pusher.
 // The pusher will be left in a paused state on exit.
 void MaybePopulateFIFOCache(void);
+
+DWORD GetDMAPushAddress(void);
+DWORD GetDMAPullAddress(void);
+void SetDMAPushAddress(DWORD target);
+
+void GetDMAState(DMAState *result);
 
 #endif  // NV2A_TRACE_XBOX_HELPER_H
