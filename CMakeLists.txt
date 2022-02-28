@@ -59,6 +59,14 @@ set_target_properties(
 )
 add_dependencies(ddxt_loader_lib dyndxt_loader)
 
+enable_language(ASM_NASM)
+set(ntrc_asm_sources ntrc_ddxt/exchange_dword.asm)
+set_source_files_properties(${ntrc_asm_sources} PROPERTIES LANGUAGE ASM_NASM)
+add_library(
+        ntrc_ddxt_asm_lib
+        STATIC
+        ${ntrc_asm_sources}
+)
 
 set(TARGET ntrc_ddxt)
 
@@ -69,11 +77,17 @@ add_library(
         ntrc_ddxt/cmd_hello.h
         ntrc_ddxt/dxtmain.c
         ntrc_ddxt/dxtmain.h
+        ntrc_ddxt/exchange_dword.h
+        ntrc_ddxt/register_defs.h
+        ntrc_ddxt/xbox_helper.c
+        ntrc_ddxt/xbox_helper.h
+        third_party/xqemu/hw/xbox/nv2a/nv2a_regs.h
 )
 target_include_directories(
         ${TARGET}
         PRIVATE
         src
+        third_party
         ${NXDK_DIR}
         ${dyndxt_include_dir}
 )
@@ -90,6 +104,7 @@ target_link_options(
 target_link_libraries(
         ${TARGET}
         PRIVATE
+        ntrc_ddxt_asm_lib
         ddxt_loader_lib
         xbdm_lib
 )
