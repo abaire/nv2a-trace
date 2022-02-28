@@ -1,13 +1,21 @@
+#include "dxtmain.h"
+
 #include <stdio.h>
 #include <string.h>
-#include <windows.h>
 
-#include "command_processor_util.h"
-#include "xbdm.h"
+#include "cmd_hello.h"
 
 // Command prefix that will be handled by this processor.
 // Keep in sync with value in ntrc.py
 static const char kHandlerName[] = "ntrc";
+static const uint32_t kTag = 0x6E747263;  // 'ntrc'
+
+static const CommandTableEntry kCommandTableDef[] = {
+    {"hello", HandleHello},
+};
+const CommandTableEntry *kCommandTable = kCommandTableDef;
+const uint32_t kCommandTableNumEntries =
+    sizeof(kCommandTableDef) / sizeof(kCommandTableDef[0]);
 
 static HRESULT_API ProcessCommand(const char *command, char *response,
                                   DWORD response_len,
@@ -22,9 +30,12 @@ static HRESULT_API ProcessCommand(const char *command, char *response,
                                   struct CommandContext *ctx) {
   const char *subcommand = command + sizeof(kHandlerName);
 
-  if (!strncmp(subcommand, "hello", 5)) {
-    strncpy(response, "Hi from ntrc", response_len);
-    return XBOX_S_OK;
+  const CommandTableEntry *entry = kCommandTable;
+  for (uint32_t i = 0; i < kCommandTableNumEntries; ++i, ++entry) {
+    uint32_t len = strlen(entry->command);
+    if (!strncmp(subcommand, entry->command, len)) {
+      return entry->processor(subcommand + len, response, response_len, ctx);
+    }
   }
 
   return XBOX_E_UNKNOWN_COMMAND;

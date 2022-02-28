@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(demo_dyndxt)
+project(nv2a_trace)
 
 set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".dll")
@@ -65,7 +65,10 @@ set(TARGET ntrc_ddxt)
 add_library(
         ${TARGET}
         SHARED
+        ntrc_ddxt/cmd_hello.c
+        ntrc_ddxt/cmd_hello.h
         ntrc_ddxt/dxtmain.c
+        ntrc_ddxt/dxtmain.h
 )
 target_include_directories(
         ${TARGET}
