@@ -1,0 +1,31 @@
+#ifndef NV2A_TRACE_TRACER_STATE_MACHINE_H
+#define NV2A_TRACE_TRACER_STATE_MACHINE_H
+
+#include <windows.h>
+
+typedef enum TracerState {
+  STATE_SHUTDOWN_REQUESTED = -2,
+  STATE_SHUTDOWN = -1,
+
+  STATE_UNINITIALIZED = 0,
+
+  STATE_INIITIALIZING = 1,
+  STATE_INIITALIZED,
+
+  STATE_IDLE,
+
+  STATE_BEGIN_WAITING_FOR_STABLE_PUSH_BUFFER = 100,
+  STATE_WAITING_FOR_STABLE_PUSH_BUFFER,
+  STATE_STABLE_PUSH_BUFFER,
+
+} TracerState;
+
+HRESULT Initialize(void);
+
+void Destroy(void);
+
+TracerState GetTracerState(void);
+
+HRESULT BeginWaitForStablePushBufferState(void);
+
+#endif  // NV2A_TRACE_TRACER_STATE_MACHINE_H

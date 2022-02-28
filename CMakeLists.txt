@@ -73,12 +73,18 @@ set(TARGET ntrc_ddxt)
 add_library(
         ${TARGET}
         SHARED
+        ntrc_ddxt/cmd_get_state.c
+        ntrc_ddxt/cmd_get_state.h
         ntrc_ddxt/cmd_hello.c
         ntrc_ddxt/cmd_hello.h
+        ntrc_ddxt/cmd_wait_for_stable_push_buffer_state.c
+        ntrc_ddxt/cmd_wait_for_stable_push_buffer_state.h
         ntrc_ddxt/dxtmain.c
         ntrc_ddxt/dxtmain.h
         ntrc_ddxt/exchange_dword.h
         ntrc_ddxt/register_defs.h
+        ntrc_ddxt/tracer_state_machine.c
+        ntrc_ddxt/tracer_state_machine.h
         ntrc_ddxt/xbox_helper.c
         ntrc_ddxt/xbox_helper.h
         third_party/xqemu/hw/xbox/nv2a/nv2a_regs.h

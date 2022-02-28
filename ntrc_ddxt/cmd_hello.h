@@ -3,6 +3,8 @@
 
 #include "xbdm.h"
 
+#define CMD_HELLO "hello"
+
 // Enumerates the command table.
 HRESULT HandleHello(const char *command, char *response, DWORD response_len,
                     CommandContext *ctx);
