@@ -3,6 +3,7 @@
 # pylint: disable=too-many-instance-attributes
 
 import copy
+import logging
 import os
 import struct
 
@@ -12,6 +13,7 @@ from .py_dll_loader import DLLLoader
 from . import xbdm_exports
 from . import xboxkrnl_exports
 
+logger = logging.getLogger(__name__)
 
 _XBDM_HOOK_COMMAND_FMT = "resume thread=0x%X"
 _XBDM_HOOK_EXPORT_INFO = xbdm_exports.DmResumeThread
@@ -65,10 +67,10 @@ class _DynamicDXTLoader:
             if_xbdm.xbdm.settimeout(old_timeout)
 
         if status != 200:
-            print(f"Load failed: {status} {message}")
+            logger.error(f"Load failed: {status} {message}")
             return False
         else:
-            print(f"Loaded {dll_path}: {message}")
+            logger.debug(f"Loaded {dll_path}: {message}")
         return True
 
     def _bootstrap(self):
@@ -98,7 +100,7 @@ class _DynamicDXTLoader:
         status, message = if_xbdm.xbdm_command("ddxt!hello")
         if status != 202:
             return False
-        print(f"Loader installed: {message}")
+        logger.debug(f"Loader installed: {message}")
         self._bootstrapped = True
         return True
 
@@ -195,7 +197,7 @@ class _DynamicDXTLoader:
 
         loader_entrypoint = loader.entry_point
 
-        print(
+        logger.debug(
             f"Loader installed at 0x{allocated_address:x} with entrypoint at "
             f"0x{loader_entrypoint:x}"
         )
@@ -213,27 +215,27 @@ class _DynamicDXTLoader:
     def _resolve_import_by_ordinal(self, module_name, ordinal):
         info = self._module_info.get(module_name)
         if not info:
-            print(f"Failed to resolve export for unknown module {module_name}")
+            logger.error(f"Failed to resolve export for unknown module {module_name}")
             return 0
 
         for export in info["exports"]:
             if export.ordinal == ordinal:
                 return self._resolve_export_info(module_name, export)
 
-        print(f"Failed to resolve export {ordinal} in {module_name}")
+        logger.error(f"Failed to resolve export {ordinal} in {module_name}")
         return 0
 
     def _resolve_import_by_name(self, module_name, export_name):
         info = self._module_info.get(module_name)
         if not info:
-            print(f"Failed to resolve export for unknown module {module_name}")
+            logger.error(f"Failed to resolve export for unknown module {module_name}")
             return 0
 
         for export in info["exports"]:
             if export.name == export_name:
                 return self._resolve_export_info(module_name, export)
 
-        print(f"Failed to resolve export {export_name} in {module_name}")
+        logger.error(f"Failed to resolve export {export_name} in {module_name}")
         return 0
 
 

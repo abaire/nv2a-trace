@@ -9,6 +9,7 @@
 
 import argparse
 import atexit
+import logging
 import os
 import signal
 import sys
@@ -18,8 +19,12 @@ from AbortFlag import AbortFlag
 import py_dyndxt_bootstrap
 import ntrc_ddxt
 import Trace
+from util import ansi_formatter
+from util import debug_logging
 from Xbox import Xbox
 import XboxHelper
+
+logger = logging.getLogger(__name__)
 
 # pylint: disable=invalid-name
 # TODO: Remove tiling suppression once AGP read in Texture.py is fully proven.
@@ -80,10 +85,10 @@ def _load_ntrc():
     tracer = ntrc_ddxt.NTRC()
     if not tracer.connect():
         raise Exception("ntrc tracer installed but not responsive")
-    print("NTRC module installed successfully")
+    logger.debug("NTRC module installed successfully")
 
     tracer.startup()
-    print("NTRC tracer started, waiting for idle state")
+    logger.debug("NTRC tracer started, waiting for idle state")
 
     tracer.wait_for_idle_state(5)
 
@@ -96,6 +101,15 @@ def main(args):
 
     xbox = Xbox()
     xbox_helper = XboxHelper.XboxHelper(xbox)
+
+    if args.verbose:
+        log_level = logging.DEBUG
+    else:
+        log_level = logging.INFO
+
+    logging.basicConfig(level=log_level)
+    if args.color:
+        ansi_formatter.colorize_logs()
 
     abort_flag = AbortFlag()
 
@@ -112,15 +126,15 @@ def main(args):
     ntrc_tracer = _load_ntrc()
     atexit.register(ntrc_tracer.shutdown)
 
-    print("\n\nAwaiting stable PB state\n\n")
+    logger.info("Awaiting stable PB state")
     dma_push_addr, dma_pull_addr = ntrc_tracer.wait_for_stable_push_buffer_state()
 
     if not dma_pull_addr or not dma_push_addr or abort_flag.should_abort:
         if not abort_flag.should_abort:
-            print("\n\nFailed to reach stable state.\n\n")
+            logger.error("Failed to reach stable state.")
         return
 
-    print("\n\nStepping through PB\n\n")
+    logger.info("Stepping through PB")
 
     # Start measuring time
     begin_time = time.monotonic()
@@ -169,7 +183,7 @@ def main(args):
     # Recover the real address
     xbox.write_u32(XboxHelper.DMA_PUSH_ADDR, trace.real_dma_push_addr)
 
-    print("\n\nFinished PB\n\n")
+    logger.info("Finished PB")
 
     # We can continue the cache updates now.
     xbox_helper.resume_fifo_pusher()
@@ -240,6 +254,12 @@ if __name__ == "__main__":
             "-v",
             "--verbose",
             help="Enable verbose debug output.",
+            action="store_true",
+        )
+
+        parser.add_argument(
+            "--color",
+            help="Colorize messages.",
             action="store_true",
         )
 

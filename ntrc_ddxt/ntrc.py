@@ -1,12 +1,15 @@
 """Python interface to the ntrc Dynamic DXT module."""
 
 import enum
+import logging
 import re
 import threading
 from typing import Tuple
 
 from . import xbdm_notification_processor
 from xboxpy.interface import if_xbdm
+
+logger = logging.getLogger(__name__)
 
 # Seconds to wait between ntrc tracer state polls.
 _AWAIT_STATE_BUSY_LOOP_SLEEP_TIME = 0.001
@@ -67,7 +70,7 @@ class NTRC:
 
         status, message = self._send("hello")
         if status != 202:
-            print(f"Failed to communicate with ntrc module: {status} {message}")
+            logger.error(f"Failed to communicate with ntrc module: {status} {message}")
             return False
 
         self._connected = True
@@ -90,12 +93,12 @@ class NTRC:
 
         status, message = self._send("detach")
         if status != 200:
-            print(
+            logger.error(
                 f"Failed to request shutdown from ntrc module, xbox state may be invalid."
             )
 
         max_wait_secs = 10
-        print(f"Waiting up to {max_wait_secs} seconds for ntrc shutdown")
+        logger.debug(f"Waiting up to {max_wait_secs} seconds for ntrc shutdown")
         self._await_states([TracerState.STATE_SHUTDOWN], max_wait_secs)
 
         xbdm_notification_processor.stop_notification_server(self._notification_server)
@@ -131,7 +134,7 @@ class NTRC:
             self._update_state(int(match.group(1), 16))
             return
 
-        print(f"NTRC: Unknown: {sender_addr} {message}")
+        logger.debug(f"NTRC: Unknown: {sender_addr} {message}")
 
     def _update_state(self, new_state):
         with self._tracer_state_cv:
@@ -175,7 +178,7 @@ class NTRC:
             return False
 
         state = state[1]
-        print(f"_await_states: New state: {state}")
+        logger.debug(f"_await_states: New state: {state}")
         if state < TracerState.STATE_INITIALIZING:
             raise ShutdownException(state)
 

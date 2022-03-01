@@ -1,12 +1,15 @@
 """Registers for and processes XBDM notifications."""
 
 import collections
+import logging
 import re
 import select
 import socket
 import threading
 
 from xboxpy.interface import if_xbdm
+
+logger = logging.getLogger(__name__)
 
 
 class XBDMNotificationListener:
@@ -103,7 +106,7 @@ class XBDMNotificationListener:
             )
 
             if self._sock in exceptional:
-                print(f"Socket exception in {self}")
+                logger.error(f"Socket exception in {self}")
                 break
 
             if self._sock in readable:
@@ -123,7 +126,7 @@ class XBDMNotificationListener:
         try:
             remote, remote_addr = self._sock.accept()
         except OSError:
-            print(f"Socket accept failed in {self}")
+            logger.error(f"Socket accept failed in {self}")
             return False
 
         self._connections.add(
@@ -134,14 +137,14 @@ class XBDMNotificationListener:
     def _on_notification_received(self, client, message):
         match = self._PREFIX_RE.match(message)
         if not match:
-            print(
+            logger.warning(
                 f"Received notification without prefix: {client.addr[0]}:{client.addr[1]}: {message}"
             )
             return
 
         prefix = match.group(1)
         if prefix not in self._message_handlers:
-            print(
+            logger.debug(
                 f"Received notification with unknown prefix: {client.addr[0]}:{client.addr[1]}: {message}"
             )
             return
@@ -161,7 +164,7 @@ _DEBUGSTR_RE = re.compile(r"debugstr\s+thread=(\d+)(?:\s+(lf|cr|crlf))?\s+string
 def _handle_debugstr(message, sender_addr):
     match = _DEBUGSTR_RE.match(message)
     if not match:
-        print(f"Received unparsable debugstr '{message}' from {sender_addr}")
+        logger.warning(f"Received unparsable debugstr '{message}' from {sender_addr}")
         return
 
     thread_id = match.group(1)
@@ -175,7 +178,7 @@ def _handle_debugstr(message, sender_addr):
     elif termination_type == "crlr":
         data += "\r\n"
 
-    print(f"DBG: {sender_addr}#{thread_id} {data}", end="")
+    print(f"DBGMSG: {sender_addr}#{thread_id} {data}", end="")
 
 
 def create_notification_server(addr=None) -> XBDMNotificationListener:
@@ -194,7 +197,7 @@ def start_notification_server(server):
         f"notifyat port=0x{server.listen_port:x} debug"
     )
     if status != 200:
-        print(f"Warning: Failed to initiate notification listener: {status} {message}")
+        logger.warning(f"Failed to initiate notification listener: {status} {message}")
 
 
 def stop_notification_server(server: XBDMNotificationListener):
@@ -203,5 +206,5 @@ def stop_notification_server(server: XBDMNotificationListener):
         f"notifyat port=0x{server.listen_port:x} drop debug"
     )
     if status != 200:
-        print(f"Warning: Failed to terminate notification listener: {status} {message}")
+        logger.warning(f"Failed to terminate notification listener: {status} {message}")
     server.shutdown()
