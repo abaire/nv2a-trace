@@ -5,6 +5,7 @@
 
 #include "cmd_attach.h"
 #include "cmd_detach.h"
+#include "cmd_discard_until_flip.h"
 #include "cmd_get_dma_addrs.h"
 #include "cmd_get_state.h"
 #include "cmd_hello.h"
@@ -20,6 +21,7 @@ static const uint32_t kTag = 0x6E747263;  // 'ntrc'
 static const CommandTableEntry kCommandTableDef[] = {
     {CMD_ATTACH, HandleAttach},
     {CMD_DETACH, HandleDetach},
+    {CMD_DISCARD_UNTIL_FLIP, HandleDiscardUntilFlip},
     {CMD_GET_DMA_ADDRS, HandleGetDMAAddrs},
     {CMD_GET_STATE, HandleGetState},
     {CMD_HELLO, HandleHello},

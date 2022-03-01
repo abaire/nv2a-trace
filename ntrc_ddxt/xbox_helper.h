@@ -40,4 +40,7 @@ void SetDMAPushAddress(DWORD target);
 
 void GetDMAState(DMAState *result);
 
+// Returns the current PGRAPH graphics class.
+DWORD FetchActiveGraphicsClass(void);
+
 #endif  // NV2A_TRACE_XBOX_HELPER_H

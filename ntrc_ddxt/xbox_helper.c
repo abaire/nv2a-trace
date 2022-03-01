@@ -67,3 +67,8 @@ void GetDMAState(DMAState *state) {
   state->method_count = (dma_state >> 18) & 0x7FF;
   state->error = (dma_state >> 29) & 0x07;
 }
+
+DWORD FetchActiveGraphicsClass(void) {
+  DWORD ctx_switch_1 = ReadDWORD(CTX_SWITCH1);
+  return ctx_switch_1 & 0xFF;
+}

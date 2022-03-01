@@ -134,6 +134,10 @@ def main(args):
             logger.error("Failed to reach stable state.")
         return
 
+    if args.wait_for_first_frame:
+        logger.info("Discarding until start of frame")
+        ntrc_tracer.discard_until_next_frame()
+
     logger.info("Stepping through PB")
 
     # Start measuring time
@@ -269,6 +273,12 @@ if __name__ == "__main__":
             default=0,
             type=int,
             help="Exit tracing after the given number of frame swaps.",
+        )
+
+        parser.add_argument(
+            "--wait_for_first_frame",
+            help="Start tracing only after the next NV097_FLIP_STALL.",
+            action="store_true",
         )
 
         return parser.parse_args()

@@ -60,7 +60,7 @@ class _DynamicDXTLoader:
         # Relocating the DLL can take some time and if_xbdm's timeout may be
         # too short.
         old_timeout = if_xbdm.xbdm.gettimeout()
-        if_xbdm.xbdm.settimeout(10)
+        if_xbdm.xbdm.settimeout(30)
         try:
             status, message = if_xbdm.xbdm_command(cmd, raw_image, len(raw_image))
         finally:

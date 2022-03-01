@@ -35,6 +35,9 @@ class TracerState(enum.IntEnum):
     """Tracer state machine states exposed by the ntrc DLL."""
 
     # Keep in sync with tracer_state_machine.h
+    STATE_FATAL_ERROR_DISCARDING_FAILED = -1010
+    STATE_FATAL_ERROR_PROCESS_PUSH_BUFFER_COMMAND_FAILED = -1000
+
     STATE_SHUTDOWN_REQUESTED = -2
     STATE_SHUTDOWN = -1
 
@@ -45,9 +48,11 @@ class TracerState(enum.IntEnum):
 
     STATE_IDLE = 100
     STATE_IDLE_STABLE_PUSH_BUFFER = 101
+    STATE_IDLE_NEW_FRAME = 102
 
     STATE_BEGIN_WAITING_FOR_STABLE_PUSH_BUFFER = 1000
     STATE_WAITING_FOR_STABLE_PUSH_BUFFER = 1001
+    STATE_DISCARDING_UNTIL_FLIP = 1010
 
     STATE_UNKNOWN = 0xFFFFFFFF
 
@@ -111,10 +116,11 @@ class NTRC:
         )
 
     def wait_for_stable_push_buffer_state(self):
-        """Ask the xbox to busyloop until the pushbuffer is in a state ready for tracing.
+        """Ask the tracer to busyloop until the pushbuffer is in a state ready for tracing.
 
         Returns: dma_push_addr, dma_pull_addr
         """
+        logger.debug("wait_for_stable_push_buffer_state")
         status, message = self._send("wait_stable_pb")
         if status != 200:
             raise Exception(f"Failed to begin wait: {status} {message}")
@@ -126,6 +132,15 @@ class NTRC:
             raise Exception("Failed to retrieve DMA addresses")
 
         return push_addr, pull_addr
+
+    def discard_until_next_frame(self):
+        """Ask the tracer to busyloop until the next NV097_FLIP_STALL."""
+        logger.debug("discard_until_next_frame")
+        status, message = self._send("discard_until_flip")
+        if status != 200:
+            raise Exception(f"Failed to begin discard: {status} {message}")
+
+        self._await_states([TracerState.STATE_IDLE_NEW_FRAME])
 
     def _handle_notification(self, message, sender_addr):
         message = message[5:]

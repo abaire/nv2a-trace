@@ -64,15 +64,6 @@ set_target_properties(
 )
 add_dependencies(ddxt_loader_lib dyndxt_loader)
 
-enable_language(ASM_NASM)
-set(ntrc_asm_sources ntrc_ddxt/exchange_dword.asm)
-set_source_files_properties(${ntrc_asm_sources} PROPERTIES LANGUAGE ASM_NASM)
-add_library(
-        ntrc_ddxt_asm_lib
-        STATIC
-        ${ntrc_asm_sources}
-)
-
 set(TARGET ntrc_ddxt)
 
 add_library(
@@ -82,6 +73,8 @@ add_library(
         ntrc_ddxt/cmd_attach.h
         ntrc_ddxt/cmd_detach.c
         ntrc_ddxt/cmd_detach.h
+        ntrc_ddxt/cmd_discard_until_flip.c
+        ntrc_ddxt/cmd_discard_until_flip.h
         ntrc_ddxt/cmd_get_dma_addrs.c
         ntrc_ddxt/cmd_get_dma_addrs.h
         ntrc_ddxt/cmd_get_state.c
@@ -92,7 +85,12 @@ add_library(
         ntrc_ddxt/cmd_wait_for_stable_push_buffer_state.h
         ntrc_ddxt/dxtmain.c
         ntrc_ddxt/dxtmain.h
+        ntrc_ddxt/exchange_dword.c
         ntrc_ddxt/exchange_dword.h
+        ntrc_ddxt/kick_fifo.c
+        ntrc_ddxt/kick_fifo.h
+        ntrc_ddxt/pushbuffer_command.c
+        ntrc_ddxt/pushbuffer_command.h
         ntrc_ddxt/register_defs.h
         ntrc_ddxt/tracer_state_machine.c
         ntrc_ddxt/tracer_state_machine.h
@@ -125,7 +123,6 @@ target_link_options(
 target_link_libraries(
         ${TARGET}
         PRIVATE
-        ntrc_ddxt_asm_lib
         ddxt_loader_lib
         xbdm_lib
 )
