@@ -8,6 +8,7 @@
 # pylint: disable=too-many-locals
 
 import argparse
+import atexit
 import os
 import signal
 import sys
@@ -109,6 +110,7 @@ def main(args):
     signal.signal(signal.SIGINT, signal_handler)
 
     ntrc_tracer = _load_ntrc()
+    atexit.register(ntrc_tracer.shutdown)
 
     print("\n\nAwaiting stable PB state\n\n")
     dma_push_addr, dma_pull_addr = ntrc_tracer.wait_for_stable_push_buffer_state()

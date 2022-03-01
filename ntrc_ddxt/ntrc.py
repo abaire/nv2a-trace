@@ -2,9 +2,10 @@
 
 import enum
 import re
-import time
+import threading
 from typing import Tuple
 
+from . import xbdm_notification_processor
 from xboxpy.interface import if_xbdm
 
 # Seconds to wait between ntrc tracer state polls.
@@ -15,6 +16,8 @@ _CAP_HEX_VALUE = r"(" + _HEX_VALUE + r")"
 
 _STATE_RE = re.compile(r"\s*state=" + _CAP_HEX_VALUE)
 _DMA_ADDRS_RE = re.compile(r"\s*push=" + _CAP_HEX_VALUE + " pull=" + _CAP_HEX_VALUE)
+
+_NOTIF_NEW_STATE_RE = re.compile(r"new_state=" + _CAP_HEX_VALUE)
 
 
 class ShutdownException(Exception):
@@ -43,6 +46,8 @@ class TracerState(enum.IntEnum):
     STATE_BEGIN_WAITING_FOR_STABLE_PUSH_BUFFER = 1000
     STATE_WAITING_FOR_STABLE_PUSH_BUFFER = 1001
 
+    STATE_UNKNOWN = 0xFFFFFFFF
+
 
 class NTRC:
     """Python interface to the ntrc Dynamic DXT module."""
@@ -52,6 +57,8 @@ class NTRC:
 
     def __init__(self):
         self._connected = False
+        self._tracer_state = TracerState.STATE_UNKNOWN
+        self._tracer_state_cv = threading.Condition()
 
     def connect(self) -> bool:
         """Verifies that the ntrc handler is available."""
@@ -59,12 +66,17 @@ class NTRC:
             return True
 
         status, message = self._send("hello")
-        if status == 202:
-            self._connected = True
-            return True
+        if status != 202:
+            print(f"Failed to communicate with ntrc module: {status} {message}")
+            return False
 
-        print(f"Failed to communicate with ntrc module: {status} {message}")
-        return False
+        self._connected = True
+        self._notification_server = (
+            xbdm_notification_processor.create_notification_server()
+        )
+        self._notification_server.add_message_handler("ntrc", self._handle_notification)
+        xbdm_notification_processor.start_notification_server(self._notification_server)
+        return True
 
     def startup(self):
         status, message = self._send("attach")
@@ -73,7 +85,6 @@ class NTRC:
 
     def shutdown(self):
         """Gracefully deactivates the ntrc module."""
-
         if not self._connected:
             return
 
@@ -82,9 +93,12 @@ class NTRC:
             print(
                 f"Failed to request shutdown from ntrc module, xbox state may be invalid."
             )
+
         max_wait_secs = 10
         print(f"Waiting up to {max_wait_secs} seconds for ntrc shutdown")
         self._await_states([TracerState.STATE_SHUTDOWN], max_wait_secs)
+
+        xbdm_notification_processor.stop_notification_server(self._notification_server)
 
     def wait_for_idle_state(self, max_seconds=None):
         """Wait until the tracer returns to an idle state."""
@@ -110,16 +124,19 @@ class NTRC:
 
         return push_addr, pull_addr
 
-    def _get_state(self):
-        status, message = self._send("state")
-        if status != 200:
-            raise Exception(f"Failed to retrieve current state: {status} {message}")
+    def _handle_notification(self, message, sender_addr):
+        message = message[5:]
+        match = _NOTIF_NEW_STATE_RE.match(message)
+        if match:
+            self._update_state(int(match.group(1), 16))
+            return
 
-        match = _STATE_RE.match(message)
-        if not match:
-            raise Exception(f"Invalid response to state request: {status} {message}")
+        print(f"NTRC: Unknown: {sender_addr} {message}")
 
-        return int(match.group(1), 16)
+    def _update_state(self, new_state):
+        with self._tracer_state_cv:
+            self._tracer_state = new_state
+            self._tracer_state_cv.notify()
 
     def _get_dma_addresses(self):
         status, message = self._send("dma_addrs")
@@ -142,18 +159,24 @@ class NTRC:
         return if_xbdm.xbdm_command(self._COMMAND_PREFIX + command_string)
 
     def _await_states(self, target_states, max_seconds=None):
-        # TODO: Set up a notification channel to receive push notifications
-        #  instead of polling.
-        start = time.time()
-        while True:
-            state = self._get_state()
-            if state in target_states:
-                return True
+        def check_state():
+            current_state = self._tracer_state
+            if (
+                current_state in target_states
+                or current_state < TracerState.STATE_INITIALIZING
+            ):
+                return (True, current_state)
+            return False
 
-            if state < TracerState.STATE_INITIALIZING:
-                raise ShutdownException(state)
+        with self._tracer_state_cv:
+            state = self._tracer_state_cv.wait_for(check_state, max_seconds)
 
-            if max_seconds:
-                elapsed = time.time() - start
-                if elapsed >= max_seconds:
-                    return False
+        if not state:
+            return False
+
+        state = state[1]
+        print(f"_await_states: New state: {state}")
+        if state < TracerState.STATE_INITIALIZING:
+            raise ShutdownException(state)
+
+        return True
