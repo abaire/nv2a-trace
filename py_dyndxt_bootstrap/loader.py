@@ -6,6 +6,7 @@ import copy
 import logging
 import os
 import struct
+import time
 
 from xboxpy.interface import if_xbdm
 from .export_info import ExportInfo
@@ -50,21 +51,26 @@ class _DynamicDXTLoader:
     def load(self, dll_path):
         """Attempts to load the given Dynamic DXT DLL."""
         if not self._bootstrap():
+            logger.debug("Bootstrap not installed and responsive")
             return False
 
         with open(dll_path, "rb") as dll_file:
             raw_image = dll_file.read()
-
-        cmd = f"ddxt!load size=0x{len(raw_image):x}"
+        raw_image_len = len(raw_image)
+        cmd = f"ddxt!load size=0x{raw_image_len:x}"
 
         # Relocating the DLL can take some time and if_xbdm's timeout may be
         # too short.
         old_timeout = if_xbdm.xbdm.gettimeout()
-        if_xbdm.xbdm.settimeout(30)
+        if_xbdm.xbdm.settimeout(60)
         try:
-            status, message = if_xbdm.xbdm_command(cmd, raw_image, len(raw_image))
+            begin_time = time.monotonic()
+            status, message = if_xbdm.xbdm_command(cmd, raw_image, raw_image_len)
         finally:
+            end_time = time.monotonic()
             if_xbdm.xbdm.settimeout(old_timeout)
+
+        logger.debug(f"DLL load took {end_time - begin_time} seconds")
 
         if status != 200:
             logger.error(f"Load failed: {status} {message}")
@@ -96,7 +102,7 @@ class _DynamicDXTLoader:
 
     def _check_loader_installed(self):
         status, message = if_xbdm.xbdm_command("ddxt!hello")
-        if status != 202:
+        if status != 200 and status != 202:
             return False
         logger.debug(f"Loader installed: {message}")
         self._bootstrapped = True
@@ -188,7 +194,9 @@ class _DynamicDXTLoader:
             loader.free()
             raise Exception("Failed to relocate loader image.")
 
+        begin_time = time.monotonic()
         if_xbdm.SetMem(allocated_address, loader.image)
+        logger.debug(f"Bootstrap upload took {time.monotonic() - begin_time} seconds")
 
         # Put the L1 loader into entrypoint mode.
         _write_u32(io_address, 0)
@@ -199,7 +207,9 @@ class _DynamicDXTLoader:
             f"Loader installed at 0x{allocated_address:x} with entrypoint at "
             f"0x{loader_entrypoint:x}"
         )
+        begin_time = time.monotonic()
         _invoke_bootstrap(loader_entrypoint)
+        logger.debug(f"Bootstrap init took {time.monotonic() - begin_time} seconds")
 
         loader.free()
 
