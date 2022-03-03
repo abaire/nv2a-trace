@@ -92,8 +92,6 @@ class _DynamicDXTLoader:
         finally:
             if_xbdm.SetMem(self._xbdm_hook_proc, patch_memory)
 
-        self._fill_loader_export_registry()
-
         return self._check_loader_installed()
 
     def _check_loader_installed(self):
@@ -205,13 +203,6 @@ class _DynamicDXTLoader:
 
         loader.free()
 
-    def _fill_loader_export_registry(self):
-        for info in self._module_info.values():
-            module_name = info["name"]
-            for export in info["exports"]:
-                self._resolve_export_info(module_name, export)
-                _populate_export_info(module_name, export)
-
     def _resolve_import_by_ordinal(self, module_name, ordinal):
         info = self._module_info.get(module_name)
         if not info:
@@ -241,18 +232,6 @@ class _DynamicDXTLoader:
 
 def _invoke_bootstrap(arg):
     if_xbdm.xbdm_command(_XBDM_HOOK_COMMAND_FMT % arg)
-
-
-def _populate_export_info(module_name: str, info: ExportInfo):
-    cmd = f'ddxt!export module="{module_name}" ordinal=0x{info.ordinal:x} addr=0x{info.address:x}'
-    if info.name:
-        cmd += f' name="{info.name}"'
-
-    status, msg = if_xbdm.xbdm_command(cmd)
-    if status != 200:
-        raise Exception(
-            f"Failed to populate export info for {module_name}@{info.ordinal}: {status} {msg}"
-        )
 
 
 # The helper functions in xboxpy use the same `resume` override as this loader and
