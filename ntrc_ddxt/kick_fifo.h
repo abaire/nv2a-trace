@@ -8,10 +8,10 @@ extern "C" {
 #endif
 
 typedef enum KickResult {
-  KICK_OK = 0x1337C0DE,
-  KICK_TIMEOUT = 0x32555359,
-  KICK_BAD_READ_PUSH_ADDR = 0x0BAD0000,
-  KICK_PUSH_MODIFIED_IN_CALL = 0x00BADBAD,
+  KICK_OK,
+  KICK_TIMEOUT,
+  KICK_BAD_READ_PUSH_ADDR,
+  KICK_PUSH_MODIFIED_IN_CALL,
 } KickResult;
 
 KickResult KickFIFO(DWORD expected_push);

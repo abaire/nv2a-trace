@@ -403,8 +403,11 @@ static void RunFIFO(DWORD pull_addr_target) {
     // FIXME: xemu does not seem to implement the CACHE behavior
     // This leads to an infinite loop as the kick fails to populate the cache.
     KickResult result = KickFIFO(pull_addr_target);
-    if (result != KICK_OK) {
-      DbgPrint("Warning: FIFO kick failed: 0x%08X\n", result);
+    for (int32_t i = 0; result == KICK_TIMEOUT && i < 64; ++i) {
+      result = KickFIFO(pull_addr_target);
+    }
+    if (result != KICK_OK && result != KICK_TIMEOUT) {
+      DbgPrint("Warning: FIFO kick failed: %d\n", result);
     }
 
     // Run the commands we have moved to CACHE, by enabling PGRAPH.
