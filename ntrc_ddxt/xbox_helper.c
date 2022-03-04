@@ -2,9 +2,11 @@
 
 #include "register_defs.h"
 
-DWORD ReadDWORD(intptr_t address) { return *(DWORD *)(address); }
+DWORD ReadDWORD(intptr_t address) { return *(volatile DWORD *)(address); }
 
-void WriteDWORD(intptr_t address, DWORD value) { *(DWORD *)(address) = value; }
+void WriteDWORD(intptr_t address, DWORD value) {
+  *(volatile DWORD *)(address) = value;
+}
 
 void DisablePGRAPHFIFO(void) {
   DWORD state = ReadDWORD(PGRAPH_STATE);
