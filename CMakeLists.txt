@@ -69,6 +69,9 @@ set(TARGET ntrc_ddxt)
 add_library(
         ${TARGET}
         SHARED
+        ntrc_ddxt/circular_buffer_impl.h
+        ntrc_ddxt/circular_buffer.c
+        ntrc_ddxt/circular_buffer.h
         ntrc_ddxt/cmd_attach.c
         ntrc_ddxt/cmd_attach.h
         ntrc_ddxt/cmd_detach.c
