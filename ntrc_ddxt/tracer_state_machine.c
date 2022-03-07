@@ -1,5 +1,6 @@
 #include "tracer_state_machine.h"
 
+#include "circular_buffer.h"
 #include "exchange_dword.h"
 #include "kick_fifo.h"
 #include "pushbuffer_command.h"
@@ -29,6 +30,10 @@ typedef struct TracerStateMachine {
   DWORD target_dma_push_addr;
 
   NotifyStateChangedHandler on_notify_state_changed;
+
+  TracerConfig config;
+  CircularBuffer pgraph_buffer;
+  CircularBuffer graphics_buffer;
 } TracerStateMachine;
 
 // Function signature for pre/post processing callbacks.
@@ -48,6 +53,8 @@ typedef struct PGRAPHClassProcessor {
   DWORD class;
   PGRAPHCommandProcessor *processors;
 } PGRAPHClassProcessor;
+
+static const uint32_t kTag = 0x6E74534D;  // 'ntSM'
 
 // Maximum number of bytes to leave in the FIFO before allowing it to be
 // processed. A cap is necessary to prevent Direct3D from performing fixups that
@@ -69,6 +76,12 @@ static void Shutdown(void);
 static void WaitForStablePushBufferState(void);
 static void DiscardUntilFramebufferFlip(void);
 
+static void *Allocator(size_t size) {
+  return DmAllocatePoolWithTag(size, kTag);
+}
+
+static void Free(void *block) { return DmFreePool(block); }
+
 HRESULT TracerInitialize(NotifyStateChangedHandler on_notify_state_changed) {
   state_machine.on_notify_state_changed = on_notify_state_changed;
   state_machine.state = STATE_UNINITIALIZED;
@@ -77,16 +90,45 @@ HRESULT TracerInitialize(NotifyStateChangedHandler on_notify_state_changed) {
   return XBOX_S_OK;
 }
 
-HRESULT TracerCreate(void) {
+void TracerGetDefaultConfig(TracerConfig *config) {
+  config->pgraph_circular_buffer_size = 1024 * 16;
+  config->graphics_circular_buffer_size = 1920 * 1080 * 4 * 2;
+
+  config->rdi_capture_enabled = FALSE;
+  config->surface_color_capture_enabled = TRUE;
+  config->surface_depth_capture_enabled = FALSE;
+  config->texture_capture_enabled = TRUE;
+}
+
+HRESULT TracerCreate(const TracerConfig *config) {
   // TODO: Verify that the state is something reasonable.
 
+  state_machine.config = *config;
   state_machine.state = STATE_INIITIALIZING;
   state_machine.request = REQ_NONE;
+
+  if (config->rdi_capture_enabled || config->surface_color_capture_enabled ||
+      config->surface_depth_capture_enabled ||
+      config->texture_capture_enabled) {
+    state_machine.graphics_buffer =
+        CBCreateEx(config->graphics_circular_buffer_size, Allocator, Free);
+    if (!state_machine.graphics_buffer) {
+      return XBOX_E_ACCESS_DENIED;
+    }
+  }
+  state_machine.pgraph_buffer =
+      CBCreateEx(config->pgraph_circular_buffer_size, Allocator, Free);
+  if (!state_machine.pgraph_buffer) {
+    CBDestroy(state_machine.graphics_buffer);
+    return XBOX_E_ACCESS_DENIED;
+  }
 
   state_machine.processor_thread = CreateThread(
       NULL, 0, TracerThreadMain, NULL, 0, &state_machine.processor_thread_id);
   if (!state_machine.processor_thread) {
     SetState(STATE_UNINITIALIZED);
+    CBDestroy(state_machine.graphics_buffer);
+    CBDestroy(state_machine.pgraph_buffer);
     return XBOX_E_FAIL;
   }
 
@@ -243,6 +285,9 @@ static void Shutdown(void) {
 
   // We can continue the cache updates now.
   ResumeFIFOPusher();
+
+  CBDestroy(state_machine.graphics_buffer);
+  CBDestroy(state_machine.pgraph_buffer);
 
   SetState(STATE_SHUTDOWN);
 }
